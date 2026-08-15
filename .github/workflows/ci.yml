@@ -1,4 +1,4 @@
-# AgentOS CI — staged pipeline:
+# AgentOS CI/CD — staged pipeline:
 #
 #   verify      → install, typecheck, blueprint §22 acceptance suite (fast feedback)
 #   build       → compile server + CLI + PWA web; upload the dist artifact
@@ -6,6 +6,9 @@
 #                 (auth wall, task→session→inbox→reply→done, webhook HMAC,
 #                 goal loop, YAML round trip) — blueprint §22 manual-demo script,
 #                 automated via the simulated runner (no API keys required)
+#   deploy      → on version tags (v*): package the build artifacts into a
+#                 runnable release bundle and publish it as a GitHub Release
+#                 (agentos-<version>.tar.gz + sha256)
 #
 # pnpm pinned via the `packageManager` field in package.json; Node 22 LTS.
 name: ci
@@ -13,6 +16,7 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
 concurrency:
@@ -119,3 +123,45 @@ jobs:
 
       - name: Functional smoke (built server + CLI)
         run: pnpm test:functional
+
+  deploy:
+    name: Deploy (GitHub Release on tags)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: agentos-dist
+
+      - name: Package release bundle
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
+          STAGE="release/agentos-${VER}"
+          mkdir -p "${STAGE}/dist" "${STAGE}/apps/web/dist"
+          cp -r dist/. "${STAGE}/dist/"
+          cp -r apps/web/dist/. "${STAGE}/apps/web/dist/"
+          cp package.json pnpm-lock.yaml pnpm-workspace.yaml "${STAGE}/"
+          sed "s/__VERSION__/${VER}/" scripts/RUNNING.md > "${STAGE}/RUNNING.md"
+          tar -czf "agentos-${VER}.tar.gz" -C release "agentos-${VER}"
+          sha256sum "agentos-${VER}.tar.gz" > "agentos-${VER}.tar.gz.sha256"
+          ls -lh "agentos-${VER}.tar.gz" "agentos-${VER}.tar.gz.sha256"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          gh release create "${GITHUB_REF_NAME}" \
+            "agentos-${VER}.tar.gz" "agentos-${VER}.tar.gz.sha256" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "AgentOS ${VER}" \
+            --generate-notes
