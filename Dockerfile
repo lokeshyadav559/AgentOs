@@ -10,6 +10,12 @@ ENV PNPM_HOME=/pnpm
 RUN npm install -g pnpm@11.7.0
 WORKDIR /app
 
+# better-sqlite3 compiles from source (native addon); bookworm-slim has no
+# toolchain, so node-gyp cannot find Python — install what the build needs.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install with the lockfile first (dependency layer is cached).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
@@ -27,10 +33,17 @@ ENV NODE_ENV=production \
 RUN npm install -g pnpm@11.7.0
 
 WORKDIR /app
-# Production dependencies only, from the lockfile.
+# Production dependencies only, from the lockfile. better-sqlite3 needs the
+# toolchain to compile; purge it afterwards so the runtime image stays slim
+# (the compiled .node binary survives).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json apps/web/
-RUN pnpm install --prod --frozen-lockfile
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/* \
+    && pnpm install --prod --frozen-lockfile \
+    && apt-get purge -y --auto-remove python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Compiled artifacts from the build stage.
 COPY --from=build /app/dist ./dist
