@@ -142,6 +142,23 @@ The bundle contains the compiled server + CLI + PWA web UI plus the run
 instructions (`RUNNING.md` inside the tarball): extract, `pnpm install --prod
 --frozen-lockfile`, then `AGENTOS_DATA_DIR=./data node dist/api/server.js`.
 
+## Docker
+
+Prebuilt images are published to GHCR on version tags:
+
+```bash
+docker pull ghcr.io/lokeshyadav559/agentos:v0.1.0
+docker run -d --name agentos -p 3000:3000 \
+  -v agentos-data:/data \
+  ghcr.io/lokeshyadav559/agentos:v0.1.0
+docker logs agentos   # operator token printed at boot
+```
+
+Data (SQLite DB, vault keys, blobs, work dirs) lives in the `/data` volume.
+The container runs as an unprivileged user. Pass your API keys with
+`-e ANTHROPIC_API_KEY=... -e DEEPSEEK_API_KEY=...` and pin the operator token
+with `-e AGENTOS_OPERATOR_TOKEN=...`.
+
 `AGENTOS_DATA_DIR` overrides the data directory (default `./data`).
 
 ## Blueprint conformance

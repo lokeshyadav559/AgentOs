@@ -14,6 +14,13 @@ system runs in demo/test mode with the simulated runner; set
 ANTHROPIC_API_KEY (Claude) and/or DEEPSEEK_API_KEY (DeepSeek BYOK) to route
 real sessions.
 
+## Or run with Docker
+
+    docker run -d --name agentos -p 3000:3000 \
+      -v agentos-data:/data \
+      ghcr.io/lokeshyadav559/agentos:latest
+    docker logs agentos   # operator token printed at boot
+
 ## CLI
 
     export AGENTOS_URL=http://127.0.0.1:3000 AGENTOS_TOKEN=<operator token>

@@ -1,0 +1,17 @@
+# Build context exclusions — keep the image build lean and hermetic.
+.git
+.github
+node_modules
+**/node_modules
+dist
+apps/web/dist
+data
+data-*
+.pnpm-store
+.npm-cache
+*.log
+*.tsbuildinfo
+*.swp
+.env
+.npmrc
+test
