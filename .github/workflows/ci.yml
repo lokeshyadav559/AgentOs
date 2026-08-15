@@ -1,9 +1,13 @@
-# AgentOS CI — install, typecheck, test, build on every push/PR.
+# AgentOS CI — staged pipeline:
 #
-# Reproduces the documented local flow (`pnpm install && pnpm build && pnpm test`):
-#   - pnpm pinned via the `packageManager` field in package.json
-#   - Node 22 LTS (matches the supported engines range, >= 20)
-#   - `--frozen-lockfile` keeps the lockfile authoritative
+#   verify      → install, typecheck, blueprint §22 acceptance suite (fast feedback)
+#   build       → compile server + CLI + PWA web; upload the dist artifact
+#   functional  → boot the BUILT artifact and drive the real HTTP/CLI surfaces
+#                 (auth wall, task→session→inbox→reply→done, webhook HMAC,
+#                 goal loop, YAML round trip) — blueprint §22 manual-demo script,
+#                 automated via the simulated runner (no API keys required)
+#
+# pnpm pinned via the `packageManager` field in package.json; Node 22 LTS.
 name: ci
 
 on:
@@ -17,6 +21,7 @@ concurrency:
 
 jobs:
   verify:
+    name: Verify (typecheck + acceptance tests)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -42,8 +47,75 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Test (blueprint §22 acceptance suite)
+      - name: Acceptance tests (blueprint §22)
         run: pnpm test
 
-      - name: Build (server + CLI + PWA web)
+  build:
+    name: Build (server + CLI + PWA web)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    needs: verify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
         run: pnpm build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentos-dist
+          path: |
+            dist
+            apps/web/dist
+          if-no-files-found: error
+
+  functional:
+    name: Functional (E2E against built artifact)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: agentos-dist
+
+      - name: Functional smoke (built server + CLI)
+        run: pnpm test:functional

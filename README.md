@@ -118,7 +118,15 @@ pnpm build          # tsc → dist/
 pnpm dev            # tsx watch server on :3000
 cd apps/web && pnpm dev   # Vite dev server on :5173, proxies /api
 pnpm test           # acceptance tests (test/*.test.ts) — all §22 items
+pnpm test:functional # boots the BUILT server + CLI and drives the live
+                     # HTTP surfaces (auth, task→inbox→done, webhook, goal
+                     # loop, YAML round trip) — the §22 manual-demo script,
+                     # automated via the simulated runner
 ```
+
+CI (`.github/workflows/ci.yml`) runs these as staged jobs: `verify`
+(typecheck + acceptance tests) → `build` (artifacts) → `functional`
+(E2E against the built artifact).
 
 `AGENTOS_DATA_DIR` overrides the data directory (default `./data`).
 

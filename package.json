@@ -14,6 +14,7 @@
     "start": "node dist/api/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:functional": "node scripts/functional-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:migrate": "tsx src/db/migrate.ts",
     "migrate:prompts": "tsx src/db/migrate-prompts.ts",
