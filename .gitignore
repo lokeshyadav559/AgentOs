@@ -1,0 +1,21 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Runtime data (SQLite DB, blobs, vault keys, work dirs)
+data/
+data-*
+
+# Local package-manager caches — environment-specific paths (see .npmrc);
+# not portable to CI runners.
+.pnpm-store/
+.npm-cache/
+.npmrc
+
+# Logs, PID files, editor artifacts
+*.log
+*.pid
+*.swp
+.DS_Store
+.env

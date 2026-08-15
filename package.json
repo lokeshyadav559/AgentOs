@@ -1,0 +1,46 @@
+{
+  "name": "agentos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AgentOS \u2014 a personal control plane + UI on top of Claude Agent SDK (per agentos-blueprint.md). Single operator.",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && pnpm --dir apps/web run build",
+    "dev": "tsx watch src/api/server.ts",
+    "start": "node dist/api/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "migrate:prompts": "tsx src/db/migrate-prompts.ts",
+    "migrate:deepseek": "tsx src/db/migrate-deepseek.ts",
+    "seed": "tsx src/db/seed.ts",
+    "build:web": "pnpm --dir apps/web run build",
+    "setup": "pnpm install && pnpm build"
+  },
+  "bin": {
+    "agentos": "dist/cli/cli.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.232",
+    "@hono/node-server": "^2.1.1",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.2",
+    "web-push": "^3.6.7",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^22.13.0",
+    "@types/web-push": "^3.6.4",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
