@@ -126,7 +126,21 @@ pnpm test:functional # boots the BUILT server + CLI and drives the live
 
 CI (`.github/workflows/ci.yml`) runs these as staged jobs: `verify`
 (typecheck + acceptance tests) → `build` (artifacts) → `functional`
-(E2E against the built artifact).
+(E2E against the built artifact) → `deploy` (only on `v*` tags).
+
+## Releases
+
+Pushing a version tag (`v0.1.0`) makes CI publish a **GitHub Release** with a
+runnable bundle `agentos-<version>.tar.gz` (+ sha256) built from the staged
+pipeline's artifacts:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+The bundle contains the compiled server + CLI + PWA web UI plus the run
+instructions (`RUNNING.md` inside the tarball): extract, `pnpm install --prod
+--frozen-lockfile`, then `AGENTOS_DATA_DIR=./data node dist/api/server.js`.
 
 `AGENTOS_DATA_DIR` overrides the data directory (default `./data`).
 
