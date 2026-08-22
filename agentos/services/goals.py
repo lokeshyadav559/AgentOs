@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Goals service + orchestrator. Port of src/services/goals.ts."""
 import json
 import re

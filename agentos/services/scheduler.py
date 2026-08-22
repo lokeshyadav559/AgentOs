@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Scheduler: fires scheduled/recurring tasks and cron automations. Port of src/services/scheduler.ts.
 Uses APScheduler for the tick loop instead of setInterval.

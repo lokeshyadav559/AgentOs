@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Sessions service stub — full implementation in phase 5 (runners layer).
 Provides the interface the rest of the services depend on.
@@ -113,7 +114,8 @@ class SessionService:
         # Gather manifest inputs
         from agentos.db.models import (
             Environment as EnvironmentRow, File as FileRow,
-            Goal as GoalRow, Skill as SkillRow, Task as TaskRow,
+            Goal as GoalRow, McpConnection as McpConnectionRow,
+            Skill as SkillRow, Task as TaskRow,
         )
         async with get_session() as db:
             skills_result = await db.execute(
@@ -145,6 +147,14 @@ class SessionService:
                 )
                 attachments = att_result.scalars().all()
 
+            # Resolve MCP connection IDs → names so servers_for_manifest can look them up
+            mcp_names: list[str] = []
+            if agent.mcp_connection_ids:
+                mcp_result = await db.execute(
+                    select(McpConnectionRow).where(McpConnectionRow.id.in_(agent.mcp_connection_ids))
+                )
+                mcp_names = [r.name for r in mcp_result.scalars().all()]
+
         env_names = (env.env_names or []) if env else []
         manifest_dict = build_session_manifest(
             project_id=row.project_id,
@@ -156,6 +166,7 @@ class SessionService:
             task=task,
             goal=goal,
             attachments=attachments,
+            mcp_connection_names=mcp_names,
         )
 
         from agentos.domain.types import SessionManifest
@@ -204,7 +215,7 @@ class SessionService:
 
         self._handles.pop(session_id, None)
         ended = datetime.now(timezone.utc).isoformat()
-        final_status = "destroyed" if outcome["status"] == "ok" else "failed"
+        final_status = "destroyed" if outcome.status == "ok" else "failed"
 
         async with get_session() as db:
             result = await db.execute(select(SessionRow).where(SessionRow.id == session_id))
@@ -212,18 +223,18 @@ class SessionService:
             if row:
                 row.status = final_status
                 row.ended_at = ended
-                row.cost_usd = outcome.get("costUsd")
-                row.commit_shas = outcome.get("commitShas", [])
-                row.summary = outcome.get("summary")
+                row.cost_usd = outcome.cost_usd
+                row.commit_shas = outcome.commit_shas
+                row.summary = outcome.summary
                 await db.commit()
 
         self._emit(session_id, "status", {"status": final_status})
 
-        if outcome.get("costUsd") and goal:
-            await self._svc.goals.add_spend(goal.id, outcome["costUsd"])
+        if outcome.cost_usd and goal:
+            await self._svc.goals.add_spend(goal.id, outcome.cost_usd)
 
         if task:
-            note = outcome.get("summary") or outcome.get("error") or ""
+            note = outcome.summary or outcome.error or ""
             await self._svc.tasks.append_activity(
                 task.id, manifest.agent.name,
                 f"session {final_status}" + (f": {note}" if note else ""),
@@ -232,7 +243,7 @@ class SessionService:
         await self._svc.activity.emit(
             project_id=manifest.projectId, type="session",
             actor=manifest.agent.name,
-            message=f"session {final_status}: {outcome.get('summary') or outcome.get('error') or ''}",
+            message=f"session {final_status}: {outcome.summary or outcome.error or ''}",
             session_id=session_id,
         )
 

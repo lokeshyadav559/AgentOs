@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 MCP factory. Port of src/mcp/index.ts.
 Builds the tool servers a session may call from its manifest connection list.

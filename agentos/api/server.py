@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 AgentOS server entry point. Port of src/api/server.ts.
 Boots the FastAPI app, initialises the DB, starts the scheduler.

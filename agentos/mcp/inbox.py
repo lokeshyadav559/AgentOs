@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Inbox MCP. Port of src/mcp/inbox.ts."""
 from agentos.mcp.context import McpServer, McpTool, create_mcp_server
 

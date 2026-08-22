@@ -1,3 +1,4 @@
+from __future__ import annotations
 """R2 filesystem MCP. Port of src/mcp/fs.ts."""
 from agentos.acl.grants import check_fs_op, normalize_path
 from agentos.mcp.context import McpServer, McpTool, create_mcp_server

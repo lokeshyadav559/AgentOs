@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Push notifications service. Port of src/services/push.ts."""
 import json
 import uuid

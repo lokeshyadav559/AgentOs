@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Persistent filesystem service. Port of src/services/files.ts.
 Local blob dir stand-in for Cloudflare R2 — swap write_blob/read_blob for an R2 client to move.
