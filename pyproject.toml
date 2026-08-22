@@ -5,18 +5,18 @@ build-backend = "hatchling.build"
 [project]
 name = "agentos"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "fastapi==0.115.5",
     "uvicorn[standard]==0.32.1",
     "sqlalchemy[asyncio]==2.0.36",
     "aiosqlite==0.20.0",
-    "pydantic==2.10.3",
-    "pydantic-settings==2.6.1",
-    "httpx==0.28.0",
+    "pydantic==2.11.7",
+    "pydantic-settings==2.7.1",
+    "httpx==0.28.1",
     "anthropic==0.40.0",
-    "mcp==1.1.2",
-    "strands-agents==0.1.5",
+    "mcp==1.29.0",
+    "strands-agents==1.53.0",
     "apscheduler==3.10.4",
     "typer==0.15.1",
     "pywebpush==2.0.0",
@@ -33,7 +33,7 @@ agentos = "agentos.cli.cli:app"
 dev = [
     "pytest==8.3.4",
     "pytest-asyncio==0.24.0",
-    "httpx==0.28.0",
+    "httpx==0.28.1",
 ]
 
 [tool.hatch.build.targets.wheel]
