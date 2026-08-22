@@ -1,16 +1,12 @@
-# AgentOS CI/CD — staged pipeline:
+# AgentOS CI/CD — Python rewrite pipeline.
 #
-#   verify      → install, typecheck, blueprint §22 acceptance suite (fast feedback)
-#   build       → compile server + CLI + PWA web; upload the dist artifact
-#   functional  → boot the BUILT artifact and drive the real HTTP/CLI surfaces
-#                 (auth wall, task→session→inbox→reply→done, webhook HMAC,
-#                 goal loop, YAML round trip) — blueprint §22 manual-demo script,
-#                 automated via the simulated runner (no API keys required)
-#   deploy      → on version tags (v*): package the build artifacts into a
-#                 runnable release bundle and publish it as a GitHub Release
-#                 (agentos-<version>.tar.gz + sha256)
-#
-# pnpm pinned via the `packageManager` field in package.json; Node 22 LTS.
+# Jobs:
+#   verify-python   → pytest acceptance suite (no API keys needed)
+#   verify-ts       → original TS typecheck + acceptance tests (kept for reference)
+#   build-web       → compile React SPA
+#   functional      → boot Python server + run HTTP smoke tests
+#   deploy          → GitHub Release on version tags (v*)
+#   docker-python   → build/push python Dockerfile.python image to GHCR
 name: ci
 
 on:
@@ -24,136 +20,138 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: Verify (typecheck + acceptance tests)
+  # ── Python acceptance suite ──────────────────────────────────────────────
+  verify-python:
+    name: Verify Python (pytest)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/setup-python@v5
         with:
-          version: 11.7.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
+          python-version: "3.12"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pip install --no-cache-dir ".[dev]"
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - name: Run tests
+        run: pytest -v
 
-      - name: Acceptance tests (blueprint §22)
-        run: pnpm test
-
-  build:
-    name: Build (server + CLI + PWA web)
+  # ── TS verify (kept for the original Node server) ────────────────────────
+  verify-ts:
+    name: Verify TS (typecheck + acceptance)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-    needs: verify
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
 
-      - name: Build
-        run: pnpm build
+  # ── Build React SPA ──────────────────────────────────────────────────────
+  build-web:
+    name: Build React SPA
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    needs: [verify-python, verify-ts]
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
+      - uses: pnpm/action-setup@v4
         with:
-          name: agentos-dist
-          path: |
-            dist
-            apps/web/dist
+          version: 11.7.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: cd apps/web && pnpm build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
           if-no-files-found: error
 
+  # ── Python functional smoke ───────────────────────────────────────────────
   functional:
-    name: Functional (E2E against built artifact)
+    name: Functional smoke (Python server)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
-    needs: build
+    needs: [build-web]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - uses: actions/setup-python@v5
         with:
-          version: 11.7.0
+          python-version: "3.12"
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-          cache: pnpm
+          name: web-dist
+          path: apps/web/dist
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pip install --no-cache-dir ".[dev]"
 
-      - name: Download dist artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: agentos-dist
+      - name: Start server in background and smoke-test
+        run: |
+          export AGENTOS_OPERATOR_TOKEN=smoke-token
+          python -m agentos.api.server &
+          SERVER_PID=$!
+          sleep 3
+          STATUS=$(curl -sf http://127.0.0.1:3000/api/health | python -c "import sys,json; d=json.load(sys.stdin); print(d['ok'])")
+          kill $SERVER_PID
+          [ "$STATUS" = "True" ] || (echo "health check failed" && exit 1)
 
-      - name: Functional smoke (built server + CLI)
-        run: pnpm test:functional
-
+  # ── GitHub Release ────────────────────────────────────────────────────────
   deploy:
-    name: Deploy (GitHub Release on tags)
+    name: GitHub Release
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: write
-    needs: build
+    needs: [build-web, functional]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Download dist artifact
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          name: agentos-dist
+          name: web-dist
+          path: apps/web/dist
 
-      - name: Package release bundle
+      - name: Package Python bundle
         run: |
           set -euo pipefail
           VER="${GITHUB_REF_NAME#v}"
           STAGE="release/agentos-${VER}"
-          mkdir -p "${STAGE}/dist" "${STAGE}/apps/web/dist"
-          cp -r dist/. "${STAGE}/dist/"
-          cp -r apps/web/dist/. "${STAGE}/apps/web/dist/"
-          cp package.json pnpm-lock.yaml pnpm-workspace.yaml "${STAGE}/"
-          sed "s/__VERSION__/${VER}/" scripts/RUNNING.md > "${STAGE}/RUNNING.md"
+          mkdir -p "${STAGE}"
+          cp -r agentos pyproject.toml scripts/RUNNING.md "${STAGE}/"
+          cp -r apps/web/dist "${STAGE}/web-dist"
           tar -czf "agentos-${VER}.tar.gz" -C release "agentos-${VER}"
           sha256sum "agentos-${VER}.tar.gz" > "agentos-${VER}.tar.gz.sha256"
-          ls -lh "agentos-${VER}.tar.gz" "agentos-${VER}.tar.gz.sha256"
 
       - name: Publish GitHub Release
         env:
@@ -163,29 +161,24 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             "agentos-${VER}.tar.gz" "agentos-${VER}.tar.gz.sha256" \
             --repo "${GITHUB_REPOSITORY}" \
-            --title "AgentOS ${VER}" \
+            --title "AgentOS ${VER} (Python)" \
             --generate-notes
 
-  docker:
-    name: Docker image (GHCR)
+  # ── Docker Python image ───────────────────────────────────────────────────
+  docker-python:
+    name: Docker Python image (GHCR)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
       packages: write
-    needs: [build, functional]
+    needs: [build-web, functional]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      # Only publish on version tags; PRs and main pushes build (validate)
-      # the image without pushing.
       - name: Login to GHCR
         uses: docker/login-action@v3
         if: startsWith(github.ref, 'refs/tags/v')
@@ -194,23 +187,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      # Event-safe tag generation: `v0.1.0` on tags (+ `latest`), a sha-based
-      # tag on PRs/main so the build is always valid (github.ref_name is
-      # `2/merge` on pull requests and must never be used as an image tag).
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/agentos
+          images: ghcr.io/${{ github.repository_owner }}/agentos-py
           tags: |
             type=ref,event=tag
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=sha,format=long,prefix=edge-
 
-      - name: Build and push image
+      - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile.python
           push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.meta.outputs.tags }}
           platforms: ${{ startsWith(github.ref, 'refs/tags/v') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
