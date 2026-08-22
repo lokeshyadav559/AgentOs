@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Triggers service. Port of src/services/triggers.ts."""
 import json
 import re

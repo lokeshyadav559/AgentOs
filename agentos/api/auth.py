@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Auth middleware. Port of src/api/auth.ts.
 Bearer token (CLI) or session cookie (UI).

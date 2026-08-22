@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Activity feed service. Port of src/services/activity.ts."""
 import uuid
 from datetime import datetime, timezone

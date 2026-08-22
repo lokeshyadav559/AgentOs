@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Secret storage service. Port of src/services/secrets.ts.
 Values are AES-256-GCM encrypted at rest; DB holds only references.

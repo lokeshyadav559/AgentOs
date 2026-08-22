@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Model → provider mapping. Port of src/runners/models.ts.
 """

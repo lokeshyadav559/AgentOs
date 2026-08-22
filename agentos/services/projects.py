@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Projects service. Port of src/services/projects.ts."""
 import re
 import uuid

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Least-privilege ACL engine. Port of src/acl/grants.ts.
 Default deny: everything an agent may touch must be listed in its manifest.

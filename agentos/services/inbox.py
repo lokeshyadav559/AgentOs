@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Inbox service. Port of src/services/inbox.ts."""
 import uuid
 from datetime import datetime, timezone

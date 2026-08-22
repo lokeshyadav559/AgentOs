@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 AgentOS configuration.
 
@@ -64,20 +65,18 @@ class Config(BaseSettings):
         if vapid_path.exists():
             v = json.loads(vapid_path.read_text())
         else:
+            import base64
             from cryptography.hazmat.primitives.asymmetric import ec
             from cryptography.hazmat.backends import default_backend
-            import base64
+            from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
             key = ec.generate_private_key(ec.SECP256R1(), default_backend())
             pub = key.public_key()
-            priv_bytes = key.private_bytes(
-                encoding=__import__("cryptography").hazmat.primitives.serialization.Encoding.Raw,
-                format=__import__("cryptography").hazmat.primitives.serialization.PrivateFormat.Raw,
-                encryption_algorithm=__import__("cryptography").hazmat.primitives.serialization.NoEncryption(),
-            )
+            # Raw 32-byte private scalar (VAPID format)
+            priv_bytes = key.private_numbers().private_value.to_bytes(32, "big")
             pub_bytes = pub.public_bytes(
-                encoding=__import__("cryptography").hazmat.primitives.serialization.Encoding.X962,
-                format=__import__("cryptography").hazmat.primitives.serialization.PublicFormat.UncompressedPoint,
+                encoding=Encoding.X962,
+                format=PublicFormat.UncompressedPoint,
             )
             v = {
                 "subject": self.push_subject,

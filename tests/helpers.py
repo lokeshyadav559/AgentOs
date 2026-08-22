@@ -25,8 +25,14 @@ async def make_context(tmp_path: Path) -> dict:
     cfg_mod._config = None
     config = cfg_mod.load_config()
 
+    from agentos.db import client as db_mod
+    db_mod._engine = None
+    db_mod._session_factory = None
+
     from agentos.db.client import init_engine, create_tables
-    init_engine(":memory:")
+    # Use a file-based temp DB per test (in-memory DBs don't work well with
+    # multiple async sessions sharing the same connection pool).
+    init_engine(str(tmp_path / "test.db"))
     await create_tables()
 
     from agentos.services.registry import build_services

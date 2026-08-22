@@ -1,3 +1,4 @@
+from __future__ import annotations
 """FastAPI application. Port of src/api/app.ts."""
 import asyncio
 import json

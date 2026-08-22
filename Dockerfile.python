@@ -11,6 +11,13 @@ RUN npm install -g pnpm@11.7.0
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Install Python and build dependencies needed for native modules
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile
 

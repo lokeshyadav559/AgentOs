@@ -1,3 +1,4 @@
+from __future__ import annotations
 """AgentOS MCP server. Port of src/mcp/agentos.ts."""
 from agentos.mcp.context import McpServer, McpTool, create_mcp_server
 from agentos.acl.grants import check_fs_op
